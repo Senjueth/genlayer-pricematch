@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PriceMatch</title><meta name="description" content="A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow."><meta name="theme-color" content="#FAFAF7">
+<link rel="stylesheet" href="app.css">
+</head><body>
+<div class="head"><div class="w"><div><h1>PriceMatch</h1><p>A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow.</p></div><button id="connect" class="ghost" type="button">Connect wallet</button></div></div>
+<div class="meta"><div class="w"><span>contract <a href="https://explorer-bradbury.genlayer.com/address/0x62a833516A8C5C559f6D441159423f5A7287Cfd8">0x62a8…Cfd8 ↗</a></span><span>network <b>testnet bradbury</b></span><span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></span></div></div>
+<main class="w">
+  <p id="status" class="status" hidden></p>
+  <div class="grid">
+    <div>
+      <section>
+        <h2>Products</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>#</th><th>Product</th><th class="r">List price</th><th class="r">Pay</th><th>Guarantee</th><th></th></tr></thead>
+          <tbody id="products"><tr><td colspan="6" class="empty">Reading the contract…</td></tr></tbody>
+        </table></div>
+      </section>
+      <section>
+        <h2>Purchases</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>#</th><th>Product</th><th class="r">Paid</th><th class="r">Refunded</th><th>Status</th></tr></thead>
+          <tbody id="purchases"><tr><td colspan="5" class="empty">Reading the contract…</td></tr></tbody>
+        </table></div>
+      </section>
+      <section id="detail" hidden></section>
+    </div>
+
+    <aside>
+      <section>
+        <h2>How a claim is judged</h2>
+        <dl class="kv">
+          <div><dt>Validators read</dt><dd>the competitor page, live</dd></div>
+          <div><dt>They must agree on</dt><dd>same product, in stock, currency, price</dd></div>
+          <div><dt>Matched if</dt><dd>same product, in stock, same currency, lower</dd></div>
+          <div><dt>Refund</dt><dd>paid × (list − found) / list</dd></div>
+          <div><dt>Claims</dt><dd>3 per purchase, one match</dd></div>
+          <div><dt>Competitors</dt><dd>only the shop's listed domains</dd></div>
+          <div><dt>After the window</dt><dd>anyone releases the rest to the shop</dd></div>
+        </dl>
+      </section>
+      <section>
+        <details>
+          <summary>List a product</summary>
+          <form id="list">
+            <label>Title<input name="title" maxlength="120" required></label>
+            <label>What counts as the same product (brand, model, variant, condition, codes)<textarea name="identity" minlength="20" maxlength="600" required></textarea></label>
+            <div class="row">
+              <label>Currency<input name="currency" pattern="[A-Za-z]{3}" value="GBP" required></label>
+              <label>List price<input name="list" type="number" step="0.01" min="0.01" required></label>
+            </div>
+            <div class="row">
+              <label>Buyers pay (GEN)<input name="price" type="number" step="any" min="0" required></label>
+              <label>Guarantee (hours)<input name="hours" type="number" min="1" max="2160" value="168" required></label>
+            </div>
+            <label>Competitor domains, one per line (up to 10)<textarea name="domains" required></textarea></label>
+            <button type="submit">List product</button>
+          </form>
+        </details>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<div class="steps"><ol>
+  <li><small>01</small><b>Buy</b><p>The buyer pays the GEN price. It stays in escrow for the guarantee window.</p></li>
+  <li><small>02</small><b>Claim</b><p>Found it cheaper at a listed competitor? File the product page. Validators each fetch it and must agree on what it shows.</p></li>
+  <li><small>03</small><b>Refund or release</b><p>A lower price refunds the difference straight from escrow. After the window anyone releases the rest to the shop.</p></li>
+</ol></div>
+
+<script type="module">
+import { contract, wireWallet, send, status, gen, toWei, esc, short, $, EXPLORER } from "./gl.js";
+const pm = contract("0x62a833516A8C5C559f6D441159423f5A7287Cfd8");
+let me = null, products = [], purchases = [];
+const when = (ts) => ts ? new Date(ts * 1000).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "–";
+const money = (minor, cur) => `${(minor / 100).toFixed(2)} ${esc(cur)}`;
+const same = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+const addr = (a) => `<a class="mono" href="${EXPLORER}/address/${esc(a)}">${short(a)}</a>${same(a, me) ? " (you)" : ""}`;
+const stateOf = (pu) => pu.released ? ["released", ""] : pu.matched ? ["matched", "ok"] : Date.now() / 1000 > pu.deadline ? ["window closed", "on"] : ["guaranteed", "ok"];
+
+async function load(openId) {
+  try {
+    const n = await pm.read("get_counts");
+    [products, purchases] = await Promise.all([
+      Promise.all([...Array(n.products).keys()].map((i) => pm.read("get_product", [i]))),
+      Promise.all([...Array(n.purchases).keys()].reverse().map((i) => pm.read("get_purchase", [i]))),
+    ]);
+    $("#products").innerHTML = products.length ? products.map((p) => `<tr><td class="num mut">${p.id}</td>
+      <td>${esc(p.title)}<br><span class="mut">${p.competitors.map(esc).join(", ")}</span></td>
+      <td class="r num">${money(p.list_price, p.currency)}</td><td class="r num">${gen(p.price_wei, 6)} GEN</td>
+      <td>${Math.round(p.window / 3600)} h</td>
+      <td>${me && p.active && !same(p.shop, me) ? `<button class="ghost" data-buy="${p.id}">Buy</button>` : p.active ? "" : `<span class="tag">off sale</span>`}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty">No products yet.</td></tr>`;
+    $("#purchases").innerHTML = purchases.length ? purchases.map((pu) => { const [s, t] = stateOf(pu); return `<tr style="cursor:pointer" data-id="${pu.id}">
+      <td class="num mut">${pu.id}</td><td><a href="#purchase-${pu.id}">${esc(products[pu.product_id]?.title ?? "")}</a></td>
+      <td class="r num">${gen(pu.paid, 6)} GEN</td><td class="r num">${gen(pu.refunded, 6)} GEN</td><td><span class="tag ${t}">${s}</span></td></tr>`; }).join("")
+      : `<tr><td colspan="5" class="empty">No purchases yet.</td></tr>`;
+    const h = location.hash.match(/^#purchase-(\d+)$/), id = openId ?? (h ? Number(h[1]) : null);
+    if (purchases.length) show(Number.isInteger(id) && purchases.some((p) => p.id === id) ? id : purchases[0].id);
+  } catch (e) {
+    $("#purchases").innerHTML = `<tr><td colspan="5" class="empty">Could not read the contract: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function actions(pu, pr) {
+  if (!me) return `<p class="hint" style="margin-top:16px">Connect the buyer or shop wallet to act. Anyone can release the escrow after the window.</p>`;
+  const isB = same(pu.buyer, me), isS = same(pr.shop, me), open = Date.now() / 1000 <= pu.deadline, out = [];
+  if (isB && open && pu.claims_left > 0)
+    out.push(`<form data-form="claim"><label>Competitor product page (https, on ${pr.competitors.map(esc).join(", ")}) · ${pu.claims_left} claim${pu.claims_left > 1 ? "s" : ""} left<input name="url" type="url" pattern="https://.*" required></label><div><button>File claim</button></div></form>`);
+  if (!open && !pu.released) out.push(`<button class="ghost" data-act="release">Release ${gen(pu.held, 6)} GEN to the shop</button>`);
+  const rec = isB ? pu.buyer_recoverable : isS ? pu.shop_recoverable : 0;
+  if (rec > 0)
+    out.push(`<form data-form="recover" class="row" style="align-items:end"><label>Recover ${gen(rec, 6)} GEN from a failed payment, to<input name="to" pattern="0x[0-9a-fA-F]{40}" value="${esc(me)}" required></label><div><button>Recover</button></div></form>`);
+  if (!isB && !isS && !out.length) return `<p class="hint" style="margin-top:16px">You are not a party to this purchase.</p>`;
+  return out.length ? `<div style="display:grid;gap:12px;margin-top:20px">${out.join("")}</div>` : "";
+}
+
+async function show(id) {
+  const pu = purchases.find((x) => x.id === id), pr = pu && products[pu.product_id];
+  if (!pr) return;
+  const [claims, payouts] = await Promise.all(["get_claims", "get_payouts"].map((f) => pm.read(f, [id])));
+  const settle = (p) => me && p.status === "SENT" ? ` <button class="ghost" data-act="settle_payout" data-arg="${p.id}" title="Settle from this transfer's result once the paying transaction is finalized">Settle</button>` : "";
+  const el = $("#detail");
+  el.hidden = false;
+  el.innerHTML = `<h2>Purchase #${pu.id} · ${esc(pr.title)}</h2>
+    <p style="margin:4px 0 12px">${esc(pr.identity)}</p>
+    <dl class="kv">
+      <div><dt>Buyer</dt><dd>${addr(pu.buyer)}</dd></div><div><dt>Shop</dt><dd>${addr(pr.shop)}</dd></div>
+      ${same(pu.refund_to, pu.buyer) ? "" : `<div><dt>Refunds to</dt><dd>${addr(pu.refund_to)}</dd></div>`}
+      <div><dt>List price at purchase</dt><dd>${money(pu.list_price, pu.currency)}</dd></div>
+      <div><dt>Paid</dt><dd>${gen(pu.paid, 6)} GEN · ${gen(pu.held, 6)} held</dd></div>
+      <div><dt>Guarantee until</dt><dd>${when(pu.deadline)}</dd></div>
+      <div><dt>Competitors</dt><dd>${pr.competitors.map(esc).join(", ")}</dd></div>
+    </dl>
+    <h2 style="margin-top:24px">Claims</h2>
+    ${claims.length ? claims.map((c, k) => `<div style="margin-top:12px"><b>Claim ${k + 1}: <span class="tag ${c.outcome === "matched" ? "ok" : "bad"}">${esc(c.outcome)}</span></b> ${esc(c.reason)}
+      <dl class="kv"><div><dt>Page</dt><dd><a class="mono" href="${esc(c.url)}">${esc(c.url.replace(/^https:\/\//, "").slice(0, 60))}</a></dd></div>
+      <div><dt>Validators agreed</dt><dd>${c.same_product ? "same product" : "different product"} · ${c.in_stock ? "in stock" : "out of stock"} · ${c.price > 0 ? money(c.price, c.currency) : "no price"}</dd></div>
+      ${c.quote ? `<div><dt>Price text quoted</dt><dd>“${esc(c.quote)}”</dd></div>` : ""}
+      <div><dt>Page judged</dt><dd class="mono" title="SHA-256 of the response body the leader judged">${esc(c.page_sha256.slice(0, 16))}… · ${c.page_chars} chars</dd></div>
+      ${c.refund ? `<div><dt>Refund</dt><dd>${gen(c.refund, 6)} GEN</dd></div>` : ""}<div><dt>At</dt><dd>${when(c.at)}</dd></div></dl></div>`).join("")
+      : `<p class="hint">No claims yet.</p>`}
+    ${payouts.length ? `<h2 style="margin-top:24px">Payouts</h2><div class="tbl"><table><thead><tr><th>#</th><th>Kind</th><th>To</th><th class="r">Amount</th><th>Transfer</th></tr></thead><tbody>
+      ${payouts.map((p) => `<tr><td class="num mut">${p.id}</td><td>${esc(p.kind)}</td><td>${addr(p.to)}</td><td class="r num">${gen(p.amount, 6)}</td>
+        <td><span class="tag ${p.status === "FAILED" ? "bad" : ""}">${{ FAILED: "failed, recoverable", DELIVERED: "delivered" }[p.status] || "sent"}</span>${settle(p)}</td></tr>`).join("")}
+    </tbody></table></div>` : ""}
+    ${actions(pu, pr)}`;
+  el.dataset.id = pu.id;
+}
+
+$("#products").addEventListener("click", async (e) => {
+  const id = e.target.dataset?.buy; if (id === undefined) return;
+  const p = products[Number(id)];
+  const to = prompt(`Buy "${p.title}" for ${gen(p.price_wei, 6)} GEN.\nRefunds go to your address; enter another to change it, or leave empty.`, "");
+  if (to === null) return;
+  if (await send(pm, "Buy", "buy", [p.id, to.trim()], BigInt(p.price_wei))) load();
+});
+$("#purchases").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) { e.preventDefault(); history.replaceState(null, "", `#purchase-${tr.dataset.id}`); show(Number(tr.dataset.id)); $("#detail").scrollIntoView({ behavior: "smooth" }); } });
+$("#detail").addEventListener("click", async (e) => {
+  const fn = e.target.dataset?.act; if (!fn) return;
+  const id = Number($("#detail").dataset.id);
+  let args = [id];
+  if (fn === "settle_payout") {
+    const tx = prompt("GenLayer transaction that made this payment (0x…)"), fin = tx && prompt("Consensus-layer transaction that finalized it (0x…)");
+    if (!fin) return;
+    args = [Number(e.target.dataset.arg), tx.trim(), fin.trim()];
+  }
+  if (await send(pm, fn.replaceAll("_", " "), fn, args)) load(id);
+});
+$("#detail").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, fn = f.dataset.form, id = Number($("#detail").dataset.id);
+  const args = fn === "claim" ? [id, f.url.value] : [id, f.to.value];
+  if (fn === "claim") status("Claim: validators fetch the page and must agree on what it shows; this can take a few minutes.");
+  if (await send(pm, fn, fn, args)) load(id);
+});
+$("#list").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, domains = f.domains.value.split(/\s+/).filter(Boolean);
+  if (domains.length > 10) return status("List at most 10 competitor domains.", true);
+  const args = [f.title.value, f.identity.value, f.currency.value.toUpperCase(), Math.round(f.list.value * 100), toWei(f.price.value), JSON.stringify(domains), f.hours.value * 3600];
+  if (await send(pm, "List product", "list_product", args)) { f.reset(); load(); }
+});
+wireWallet((a) => { me = a; load(Number($("#detail").dataset.id) || undefined); });
+load();
+</script>
+
+<footer><div class="w"><span>Built on <a href="https://genlayer.com">GenLayer</a></span><a href="https://github.com/Senjueth/genlayer-pricematch">Source</a></div></footer>
+</body></html>
