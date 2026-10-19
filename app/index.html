@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="app.css">
 </head><body>
 <div class="head"><div class="w"><div><h1>PriceMatch</h1><p>A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow.</p></div><button id="connect" class="ghost" type="button">Connect wallet</button></div></div>
-<div class="meta"><div class="w"><span>contract <a href="https://explorer-bradbury.genlayer.com/address/0x62a833516A8C5C559f6D441159423f5A7287Cfd8">0x62a8…Cfd8 ↗</a></span><span>network <b>testnet bradbury</b></span><span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></span></div></div>
+<div class="meta"><div class="w"><span>contract <a href="https://explorer-bradbury.genlayer.com/address/0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b">0xAc41…096b ↗</a></span><span>network <b>testnet bradbury</b></span><span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></span></div></div>
 <main class="w">
   <p id="status" class="status" hidden></p>
   <div class="grid">
@@ -70,7 +70,7 @@
 
 <script type="module">
 import { contract, wireWallet, send, status, gen, toWei, esc, short, $, EXPLORER } from "./gl.js";
-const pm = contract("0x62a833516A8C5C559f6D441159423f5A7287Cfd8");
+const pm = contract("0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b");
 let me = null, products = [], purchases = [];
 const when = (ts) => ts ? new Date(ts * 1000).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "–";
 const money = (minor, cur) => `${(minor / 100).toFixed(2)} ${esc(cur)}`;
