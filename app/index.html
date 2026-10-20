@@ -1,10 +1,22 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PriceMatch</title><meta name="description" content="A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow."><meta name="theme-color" content="#FAFAF7">
+<title>PriceMatch</title><meta name="description" content="A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow."><meta name="theme-color" content="#1F4FD1">
+<link rel="icon" href="data:image/svg+xml,<svg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'><rect width='512' height='512' fill='%231F4FD1'/><path d='M82 256 190 140h240v232H190z' fill='%23fff'/><circle cx='175' cy='256' r='20' fill='%231F4FD1'/><path d='m245 260 50 50 85-105' fill='none' stroke='%231F4FD1' stroke-width='38' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="app.css">
 </head><body>
-<div class="head"><div class="w"><div><h1>PriceMatch</h1><p>A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow.</p></div><button id="connect" class="ghost" type="button">Connect wallet</button></div></div>
-<div class="meta"><div class="w"><span>contract <a href="https://explorer-bradbury.genlayer.com/address/0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b">0xAc41…096b ↗</a></span><span>network <b>testnet bradbury</b></span><span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></span></div></div>
+<header class="hero"><div class="w">
+  <div class="top"><div class="brand"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#1F4FD1"/><path d="M82 256 190 140h240v232H190z" fill="#fff"/><circle cx="175" cy="256" r="20" fill="#1F4FD1"/><path d="m245 260 50 50 85-105" fill="none" stroke="#1F4FD1" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/></svg>PriceMatch</div><button id="connect" class="ghost" type="button">Connect wallet</button></div>
+  <h1>Found it cheaper? <em>Get the difference back.</em></h1>
+  <p>A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow.</p>
+  <div class="pills"><a href="https://explorer-bradbury.genlayer.com/address/0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b">contract 0xAc41…096b ↗</a><span>testnet bradbury</span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></div>
+</div></header>
+<div class="steps w"><ol>
+  <li><small>01</small><b>Buy</b><p>The buyer pays the GEN price. It stays in escrow for the guarantee window.</p></li>
+  <li><small>02</small><b>Claim</b><p>Found it cheaper at a listed competitor? File the product page. Validators each fetch it and must agree on what it shows.</p></li>
+  <li><small>03</small><b>Refund or release</b><p>A lower price refunds the difference straight from escrow. After the window anyone releases the rest to the shop.</p></li>
+</ol></div>
 <main class="w">
   <p id="status" class="status" hidden></p>
   <div class="grid">
@@ -62,11 +74,6 @@
   </div>
 </main>
 
-<div class="steps"><ol>
-  <li><small>01</small><b>Buy</b><p>The buyer pays the GEN price. It stays in escrow for the guarantee window.</p></li>
-  <li><small>02</small><b>Claim</b><p>Found it cheaper at a listed competitor? File the product page. Validators each fetch it and must agree on what it shows.</p></li>
-  <li><small>03</small><b>Refund or release</b><p>A lower price refunds the difference straight from escrow. After the window anyone releases the rest to the shop.</p></li>
-</ol></div>
 
 <script type="module">
 import { contract, wireWallet, send, status, gen, toWei, esc, short, $, EXPLORER } from "./gl.js";
