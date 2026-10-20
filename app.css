@@ -62,3 +62,4 @@ details summary{cursor:pointer;font-size:18px;font-weight:700;list-style:none;di
 details summary::-webkit-details-marker{display:none}details summary::after{content:"+";font-size:22px;color:var(--acc)}details[open] summary::after{content:"–"}
 details[open] summary{margin-bottom:16px}
 @media(min-width:640px){#detail dl.kv div{grid-template-columns:200px minmax(0,1fr);gap:12px;align-items:baseline}}
+@media(max-width:640px){th,td{white-space:nowrap}}
