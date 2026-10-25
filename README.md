@@ -26,7 +26,7 @@ Testnet Bradbury (chainId 4221): [`0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b`](
 
 ## Bradbury evidence
 
-Run by [`tests/integration/test_price_match.py`](tests/integration/test_price_match.py) (6 passed, 2 h 27 min). Contract `0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b` (deploy [`0x1c473582…`](https://explorer-bradbury.genlayer.com/tx/0x1c4735825d9a326430bd41fd5fb101e4b093bc2bce431f5a41d89d9a23939d33)), code `build/price_match.py` (sha256 `5a7fab01…`). Shop and buyer are separate accounts; validators fetched the pages live. Every claim stores the page's SHA-256: the same book's page hashed `a6e572bec156…` in all three claims.
+Run by [`tests/integration/test_price_match.py`](tests/integration/test_price_match.py) (6 passed, 2 h 27 min). Contract `0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b` (deploy [`0x1c473582…`](https://explorer-bradbury.genlayer.com/tx/0x1c4735825d9a326430bd41fd5fb101e4b093bc2bce431f5a41d89d9a23939d33)), code `build/price_match.py` (sha256 `5a7fab01…`). Shop and buyer are separate accounts; validators fetched the pages live. Settling a transfer to a GenLayer-contract payee from its child transaction (step 4 below) was added after this run and is covered by the direct tests; this deployment predates it. Every claim stores the page's SHA-256: the same book's page hashed `a6e572bec156…` in all three claims.
 
 | Purchase | Step | Transaction | Outcome |
 |---|---|---|---|
@@ -128,6 +128,11 @@ finalizes, so the contract never assumes a payment arrived.
      payout's recipient with a message id linked to `tx_hash`; **FAILED** if
      it holds the messages contract's execution-failed event for `tx_hash`.
      Neither (a call that sent nothing) settles nothing.
+  4. A payee that is a GenLayer contract receives the transfer in its own
+     child transaction (ConsensusMain's `InternalMessageProcessed(tx_hash,
+     child, payee)`). Validators then read the child: it must be to the
+     payee and finalized; **DELIVERED** only if it finished with a return,
+     otherwise **FAILED** and recoverable by the payee as below.
 - A FAILED payout is credited to its payee (buyer for refunds, shop for
   releases); `recover(purchase, to)` re-sends it to any address.
 - A payout settles once, and a paying transaction settles at most one payout.
@@ -166,21 +171,21 @@ finalizes, so the contract never assumes a payment arrived.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 genvm-lint check contracts/price_match.py
-pytest tests/direct -v                         # 43 tests
+pytest tests/direct -v                         # 47 tests
 # integration, on Bradbury, against the packed code (keys in GL_PK0..1 env vars)
 python deploy/shrink.py contracts/price_match.py build/price_match.py --pack
 cd tests/integration && gltest . -v -s --network testnet_bradbury
 ```
 
 The source is 32 KB; Bradbury rejects deploys above ~20 KB of code, so deploy
-the output of `deploy/shrink.py` (AST-checked; 8.8 KB packed). CI re-runs the
+the output of `deploy/shrink.py` (AST-checked; 9.1 KB packed). CI re-runs the
 direct tests against the packed code.
 
-## Tests (43 direct, Bradbury E2E)
+## Tests (47 direct, Bradbury E2E)
 
 - **Listing and buying**: validation of every listing field; exact payment, the shop cannot buy, refund address.
 - **Claims**: proportional refund; validators must agree on the exact price, and on every rejected reason (different product, out of stock, other currency, no price, not lower); thousands separators; domain allowlist with subdomains and `www.`; an unavailable page does not use up a claim; truncation is flagged; fenced page text; claim limits and window; malformed model answers.
-- **Money**: release after the window; claims and releases revert when the contract cannot pay; delivered and failed settlement; recovery by the right party, to any address, repeatable after another failure; settle rejects another transaction, sender, time, method, purchase or address, a finalization of another transaction, and a call that sent nothing.
+- **Money**: release after the window; claims and releases revert when the contract cannot pay; delivered and failed settlement, including a payee that is a GenLayer contract (settled from its child transaction: delivered, failed and recoverable by the payee, not yet finalized, to another address); recovery by the right party, to any address, repeatable after another failure; settle rejects another transaction, sender, time, method, purchase or address, a finalization of another transaction, and a call that sent nothing.
 - **Bradbury E2E** (`tests/integration`): real validators read books.toscrape.com and real transfers settle, as in the evidence above.
 
 ## License

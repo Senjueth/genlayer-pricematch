@@ -348,11 +348,10 @@ def _transfer_result(q: dict) -> str:
     for addr, t, data in logs:
         if addr == q["contract"] and t[:2] == [T_EXECUTED, to_topic] and data[:66] in msg_ids:
             return "delivered"
-        # ponytail: a transfer to another GenLayer contract becomes its own
-        # transaction; it is never treated as failed. Read the child's result
-        # if such payees matter.
+        # A transfer to another GenLayer contract becomes its own (child)
+        # transaction: its outcome is that transaction's execution result.
         if addr == CONSENSUS_MAIN and len(t) >= 3 and t[0] == T_INTERNAL and t[2] == to_topic:
-            return "delivered"
+            return _child_result(t[1], q)
     # A failed transfer leaves the messages contract's failure event for the
     # paying transaction; a transaction that sent nothing (e.g. a call of the
     # same method that did not pay) leaves neither, so it cannot settle FAILED.
@@ -360,6 +359,15 @@ def _transfer_result(q: dict) -> str:
         return "failed"
     raise gl.vm.UserError(f"{ERR_EXPECTED} that transaction did not create this payout")
 
+
+def _child_result(child: str, q: dict) -> str:
+    """'delivered' or 'failed' from the child transaction that carried a transfer to a GenLayer contract."""
+    tx = _rpc("gen_getTransactionReceipt", [{"txId": child}])
+    if str(tx.get("recipient", "")).lower() != q["to"]:
+        raise gl.vm.UserError(f"{ERR_EXPECTED} the transfer's transaction is not to this payee")
+    if tx.get("status") != GEN_FINALIZED:
+        raise gl.vm.UserError(f"{ERR_EXPECTED} the transfer's transaction is not finalized yet")
+    return "delivered" if tx.get("txExecutionResult") == GEN_RETURNED else "failed"
 
 def _add(a, b) -> u256:
     return u256(int(a) + int(b))

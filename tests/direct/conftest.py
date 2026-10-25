@@ -93,6 +93,7 @@ T_FINALIZED = "0x24196ec40f90671b7144e716978686b4f3c7d6b00b23da3971ef2b52af27d87
 T_EXECUTED = "0x4aacc1769103d0575734a31601a30d8f74c7843414f868342af438b4fdc4d78e"
 T_MESSAGE = "0x1a2b93b175bf31d44b127b5c4c0f72cbf128f5230ad594a52a00dfa559c96b51"
 T_MSG_FAILED = "0x5ae8e754fbc8b7b56c89e264bdcd8bb847036b23ac1a0f791f48b62438f2bab9"
+T_INTERNAL = "0xfcd4925545581224af98ce36b42d51bb88917ea0c3fe675c27e1df1a22282555"
 
 
 def _rlp(item) -> bytes:
@@ -126,7 +127,7 @@ class Chain:
         self.n += 1
         return "0x" + f"{self.n:064x}"
 
-    def pay(self, c, payout_id, method, args, delivered=True, status=7, result=1, sender=None, at=None):
+    def pay(self, c, payout_id, method, args, delivered=True, status=7, result=1, sender=None, at=None, child_status=7, child_result=1, child_to=None):
         """Record the paying transaction of `payout_id` and its finalization. Returns (tx, finalize_tx)."""
         from genlayer.py import calldata
 
@@ -146,7 +147,13 @@ class Chain:
         logs = [
             {"address": CONSENSUS_MAIN, "topics": [T_FINALIZED, tx], "data": "0x"},
         ]
-        if delivered:  # True: delivered; False: the transfer failed; None: the transaction sent nothing
+        if delivered == "contract":  # the payee is a GenLayer contract: the transfer is a child transaction
+            child = self._hash()
+            logs.append({"address": CONSENSUS_MAIN, "topics": [T_INTERNAL, child, _pad(p["to"]), _pad(p["to"])], "data": "0x"})
+            self.receipts[("gen_getTransactionReceipt", child)] = {
+                "sender": me, "recipient": (child_to or p["to"]).lower(), "status": child_status, "txExecutionResult": child_result,
+            }
+        elif delivered:  # True: delivered; False: the transfer failed; None: the transaction sent nothing
             logs.append({"address": MESSAGES, "topics": [T_MESSAGE, tx, msg], "data": "0x"})
             logs.append({"address": me, "topics": [T_EXECUTED, _pad(p["to"])], "data": msg + "00" * 64})
         elif delivered is False:  # as on Bradbury: the messages contract's failure event, no MessagesOnFinalization

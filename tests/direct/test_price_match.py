@@ -244,6 +244,35 @@ def test_failed_refund_is_recovered_by_the_buyer_to_another_address(shop, direct
     assert shop.get_purchase(0)["buyer_recoverable"] == REFUND
 
 
+# A payee that is a GenLayer contract receives the transfer in a child transaction.
+
+def test_transfer_to_a_contract_settles_from_the_child_transaction(shop, direct_vm, direct_bob, chain):
+    _claim(direct_vm, shop, direct_bob)
+    tx, fin = chain.pay(shop, 0, "claim", [0, URL], delivered="contract")
+    assert shop.settle_payout(0, tx, fin) == "DELIVERED"
+    assert shop.get_purchase(0)["buyer_recoverable"] == 0
+    assert direct_vm.run_validator(leader_result="failed") is False
+
+def test_failed_transfer_to_a_contract_is_recoverable_by_the_payee(shop, direct_vm, direct_bob, chain, ledger):
+    _claim(direct_vm, shop, direct_bob)
+    tx, fin = chain.pay(shop, 0, "claim", [0, URL], delivered="contract", child_result=2)  # FINISHED_WITH_ERROR
+    assert shop.settle_payout(0, tx, fin) == "FAILED"
+    assert direct_vm.run_validator(leader_result="delivered") is False
+    assert shop.get_payouts(0)[0]["status"] == "FAILED"
+    assert shop.get_purchase(0)["buyer_recoverable"] == REFUND
+    assert shop.get_accounting()["expected_balance"] == PRICE_WEI
+    tick(direct_vm)
+    direct_vm.sender = direct_bob
+    assert shop.recover(0, OTHER) == REFUND and ledger.paid_to(OTHER) == REFUND
+
+@pytest.mark.parametrize("kw, err", [({"child_status": 5}, "not finalized"), ({"child_to": OTHER}, "not to this payee")])
+def test_contract_transfer_settles_only_from_its_finalized_child(kw, err, shop, direct_vm, direct_bob, chain):
+    _claim(direct_vm, shop, direct_bob)
+    tx, fin = chain.pay(shop, 0, "claim", [0, URL], delivered="contract", **kw)
+    with direct_vm.expect_revert(err):
+        shop.settle_payout(0, tx, fin)
+    assert shop.get_payouts(0)[0]["status"] == "SENT" and shop.get_purchase(0)["buyer_recoverable"] == 0
+
 def test_failed_release_is_recoverable_by_the_shop_only(shop, direct_vm, direct_alice, direct_bob, chain):
     tick(direct_vm, 15 * DAY)
     shop.release(0)
