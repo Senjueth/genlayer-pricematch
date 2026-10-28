@@ -10,7 +10,7 @@
   <div class="top"><div class="brand"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#1F4FD1"/><path d="M82 256 190 140h240v232H190z" fill="#fff"/><circle cx="175" cy="256" r="20" fill="#1F4FD1"/><path d="m245 260 50 50 85-105" fill="none" stroke="#1F4FD1" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/></svg>PriceMatch</div><button id="connect" class="ghost" type="button">Connect wallet</button></div>
   <h1>Found it cheaper? <em>Get the difference back.</em></h1>
   <p>A price-match guarantee that pays out without the shop's say-so: validators read the competitor's page and refund the difference from escrow.</p>
-  <div class="pills"><a href="https://explorer-bradbury.genlayer.com/address/0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b">contract 0xAc41…096b ↗</a><span>testnet bradbury</span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></div>
+  <div class="pills"><a href="https://scan.testnet-chain.genlayer.com/address/0x596Ea3d8FB24963D2fb17FB081bAF97Bc172d94E">contract 0x596E…d94E ↗</a><span>testnet bradbury</span><a href="https://github.com/Senjueth/genlayer-pricematch">source ↗</a></div>
 </div></header>
 <div class="steps w"><ol>
   <li><small>01</small><b>Buy</b><p>The buyer pays the GEN price. It stays in escrow for the guarantee window.</p></li>
@@ -77,7 +77,7 @@
 
 <script type="module">
 import { contract, wireWallet, send, status, gen, toWei, esc, short, $, EXPLORER } from "./gl.js";
-const pm = contract("0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b");
+const pm = contract("0x596Ea3d8FB24963D2fb17FB081bAF97Bc172d94E");
 let me = null, products = [], purchases = [];
 const when = (ts) => ts ? new Date(ts * 1000).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "–";
 const money = (minor, cur) => `${(minor / 100).toFixed(2)} ${esc(cur)}`;
@@ -172,14 +172,18 @@ $("#detail").addEventListener("click", async (e) => {
     if (!fin) return;
     args = [Number(e.target.dataset.arg), tx.trim(), fin.trim()];
   }
-  if (await send(pm, fn.replaceAll("_", " "), fn, args)) load(id);
+  // release pays the shop; its transfer's gas is allocated with the call (see gl.js).
+  const pu = purchases.find((x) => x.id === id);
+  if (await send(pm, fn.replaceAll("_", " "), fn, args, 0n, fn === "release" ? products[pu.product_id].shop : undefined)) load(id);
 });
 $("#detail").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, fn = f.dataset.form, id = Number($("#detail").dataset.id);
   const args = fn === "claim" ? [id, f.url.value] : [id, f.to.value];
   if (fn === "claim") status("Claim: validators fetch the page and must agree on what it shows; this can take a few minutes.");
-  if (await send(pm, fn, fn, args)) load(id);
+  // A matched claim refunds to refund_to; recover pays the given address.
+  const payee = fn === "claim" ? purchases.find((x) => x.id === id).refund_to : f.to.value;
+  if (await send(pm, fn, fn, args, 0n, payee)) load(id);
 });
 $("#list").addEventListener("submit", async (e) => {
   e.preventDefault();
