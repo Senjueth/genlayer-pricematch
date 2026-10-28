@@ -22,39 +22,43 @@ anyone ── settle_payout ── validators read that transfer's result; faile
 ## Live deployment
 
 App: [pricematch.senju.quest](https://pricematch.senju.quest) (source in [`app/`](app/): products, purchases, claims with what validators read, payouts, every role's actions)  
-Testnet Bradbury (chainId 4221): [`0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b`](https://explorer-bradbury.genlayer.com/address/0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b)
+Testnet Bradbury (chainId 4221): [`0x596Ea3d8FB24963D2fb17FB081bAF97Bc172d94E`](https://scan.testnet-chain.genlayer.com/address/0x596Ea3d8FB24963D2fb17FB081bAF97Bc172d94E)
 
 ## Bradbury evidence
 
-Run by [`tests/integration/test_price_match.py`](tests/integration/test_price_match.py) (6 passed, 2 h 27 min). Contract `0xAc41a8F5Bd4ACB53127f6719aE08a691903D096b` (deploy [`0x1c473582…`](https://explorer-bradbury.genlayer.com/tx/0x1c4735825d9a326430bd41fd5fb101e4b093bc2bce431f5a41d89d9a23939d33)), code `build/price_match.py` (sha256 `5a7fab01…`). Shop and buyer are separate accounts; validators fetched the pages live. Settling a transfer to a GenLayer-contract payee from its child transaction (step 4 below) was added after this run and is covered by the direct tests; this deployment predates it. Every claim stores the page's SHA-256: the same book's page hashed `a6e572bec156…` in all three claims.
+Bradbury Phase 2 (GenVM v0.3). Run by [`tests/integration/bradbury.mjs`](tests/integration/bradbury.mjs), every check passed; the run was resumed after the window on the same contract when the public RPC dropped connections. Contract `0x596Ea3d8FB24963D2fb17FB081bAF97Bc172d94E` (deploy [`0xd78f2ad5…`](https://scan.testnet-chain.genlayer.com/tx/0xd78f2ad5676c9877ef279511bfab6cea8e3f75f6469c7cf33d2e9d765f27e868)), code `build/price_match.py` (sha256 `afb368c6…`). Shop and buyer are separate accounts; validators fetched the pages live. Every claim stores the page's SHA-256: the same book's page hashed `a6e572bec156…` in all four claims.
 
 | Purchase | Step | Transaction | Outcome |
 |---|---|---|---|
-|  | list product 0: £60.00, 0.006 GEN, competitor books.toscrape.com, 1 h window | [`0xe7fb4360…`](https://explorer-bradbury.genlayer.com/tx/0xe7fb436094b10f2677fca2f494e46d46735e84ef4de6ac2cb29a9fef735ad043) | ok |
-|  | list product 1: same book at £50.00, 0.005 GEN | [`0x3662e3e3…`](https://explorer-bradbury.genlayer.com/tx/0x3662e3e305c67b4bfac5e117c5833dca401973fdbb2c44dc0e1526dd6ee9e591) | ok |
-| #0 | buy product 0 | [`0xbece5036…`](https://explorer-bradbury.genlayer.com/tx/0xbece50368c084169bac59d35565184455cddae972e4cc7ece8f46284c94e37f9) | 0.006 GEN in escrow |
-| #0 | claim with another book's page (£53.74) | [`0x96ad4e24…`](https://explorer-bradbury.genlayer.com/tx/0x96ad4e24c3f11d78cd6c0e33d3930186e6b1924bc29b51fc3054cb692617b18e) | rejected: **not the same product** |
-| #0 | claim with the same book's page (£51.77) | [`0x55aae771…`](https://explorer-bradbury.genlayer.com/tx/0x55aae77158a4347a6ab742c8a14710fac8a7e85e403e1634c9b4e7d0a12ec34f) | **matched**: refund 823/6000 of the price = 0.000823 GEN (payout 0) |
-| #1 | buy product 1 | [`0xc9c8a319…`](https://explorer-bradbury.genlayer.com/tx/0xc9c8a31933233ebc33f2e9e2c696ff42ad44656c200c0863ca43029eede6363e) | 0.005 GEN in escrow |
-| #1 | claim on example.com | [`0x25d836b5…`](https://explorer-bradbury.genlayer.com/tx/0x25d836b589c4895e2df56532a016dc5f25d0feca70a4988158995a8db9cb7e7b) | reverted before any fetch: domain not listed |
-| #1 | claim with the same book's page | [`0xe3982e22…`](https://explorer-bradbury.genlayer.com/tx/0xe3982e221b083ad4e855853a215896882f3bbcfb70a0713b17d3c08d14c5e906) | rejected: **not lower than the price paid** |
-| #2 | buy product 0, refund to a contract that rejects value | [`0xd154d079…`](https://explorer-bradbury.genlayer.com/tx/0xd154d0799e7ae1d4e7dfa0473755f6de98fe50d08203e5401494dca3f34803ee) | 0.006 GEN in escrow |
-| #2 | claim with the same book's page | [`0x26dab9a1…`](https://explorer-bradbury.genlayer.com/tx/0x26dab9a14439593378ec2c635f16de2b2241e8433ed33b0874334928517a08f7) | **matched**: refund 0.000823 GEN to the rejecter (payout 1) |
-|  | release #0, #1, #2 after the window | [`0x6362ee76…`](https://explorer-bradbury.genlayer.com/tx/0x6362ee763c524d38d61401d12de4477e34a38f74189e345ef7dd918b59aae7dd) | payouts 2–4 to the shop (also [`0x60293134…`](https://explorer-bradbury.genlayer.com/tx/0x6029313495dad38fc102901bdb5f22b38c22f41aaee925348034e554e842367c), [`0x0a3473b9…`](https://explorer-bradbury.genlayer.com/tx/0x0a3473b97abf320770549c4d27739ec335526969ff76b377b75121d50b27de53)) |
-| #2 | buyer recovers the failed refund to their own address | [`0x02db83f4…`](https://explorer-bradbury.genlayer.com/tx/0x02db83f4128da0135be3159093e4737057687a72044fa7d95a566e06dce1a3c7) | payout 5 |
+|  | list product 0: £60.00, 0.006 GEN, competitor books.toscrape.com, 1 h window | [`0x1f2a0a3c…`](https://scan.testnet-chain.genlayer.com/tx/0x1f2a0a3c980e668848758143156c10f989e489472d7e5694817d775e66dddd95) | ok |
+|  | list product 1: same book at £50.00, 0.005 GEN | [`0x1b7b56eb…`](https://scan.testnet-chain.genlayer.com/tx/0x1b7b56ebb8648c38d02150f342568a068e23698fa0de6b387110e8c619576dc6) | ok |
+| #0 | buy product 0 | [`0x5d4cb4ac…`](https://scan.testnet-chain.genlayer.com/tx/0x5d4cb4acff87d25f226612be68239e3f0ffbfe98740b0c779dff4749c4d4a217) | 0.006 GEN in escrow |
+| #0 | claim with another book's page (£53.74) | [`0xa1800fee…`](https://scan.testnet-chain.genlayer.com/tx/0xa1800feef91883d5193c877ac3c5d9eb76ec705fcf73e62aef5b91ac0430952a) | rejected: **not the same product** |
+| #0 | claim with the same book's page (£51.77) | [`0x703faafb…`](https://scan.testnet-chain.genlayer.com/tx/0x703faafb0144cdc89c35d96221e25a27958da07e575b88aaeaa959721837c97c) | **matched**: refund 823/6000 of the price = 0.000823 GEN (payout 0); resent after a leader timeout ([`0x989b60f7…`](https://scan.testnet-chain.genlayer.com/tx/0x989b60f709793a1fe45e11e3e8859be59eb7927b96f49fee5302d93222c69b1a), NOT_VOTED) |
+| #1 | buy product 1 | [`0xe10dbc9d…`](https://scan.testnet-chain.genlayer.com/tx/0xe10dbc9d80e79f1684bd1392560fdb7e6fd5d16967859f23608ba7747df78b9a) | 0.005 GEN in escrow |
+| #1 | claim on example.com | [`0x599ee8e8…`](https://scan.testnet-chain.genlayer.com/tx/0x599ee8e8d07dc88292390a254fa8698fa86ddce427d43d4eb308434f12fefdc1) | reverted before any fetch: domain not listed |
+| #1 | claim with the same book's page | [`0xb329cbcd…`](https://scan.testnet-chain.genlayer.com/tx/0xb329cbcd9e2a87c141a9751d2fe867b9e718b4ddf4c786225fb8c3b47050711b) | rejected: **not lower than the price paid** |
+| #2 | buy product 0, refund to an EVM contract that rejects value (`0xd69b0a93…`) | [`0xd181c72d…`](https://scan.testnet-chain.genlayer.com/tx/0xd181c72d2508c774e48c1c57bdc2c8d476cd8b003b06c791d8250a4aa8e7384e) | 0.006 GEN in escrow |
+| #2 | claim with the same book's page | [`0xb0c198f2…`](https://scan.testnet-chain.genlayer.com/tx/0xb0c198f2f775ef0571912f3bf80e8262f78365506904a8fee40a487ce3ad87d9) | **matched**: refund 0.000823 GEN to the rejecter (payout 1) |
+| #3 | buy product 0, refund to a GenLayer contract (`0x30EC0dDc…`) | [`0x46987496…`](https://scan.testnet-chain.genlayer.com/tx/0x469874969555c4df40fc2c630d61bc0597972a916edcd116b6af557120c3d1c0) | 0.006 GEN in escrow |
+| #3 | claim with the same book's page | [`0xe68d5233…`](https://scan.testnet-chain.genlayer.com/tx/0xe68d5233d5735b6d3fc778e8f1b20b04c7a85893860fc8022dfa57cbe75e69fb) | **matched**: refund 0.000823 GEN to the GenLayer contract (payout 2) |
+| #0–#3 | release each after the window | [`0xb07d0f71…`](https://scan.testnet-chain.genlayer.com/tx/0xb07d0f716a6f72ff5acd8271d2ab86d2f2e313974bcd43d139cd8b4e024356e5) | payouts 3–6 to the shop (also [`0x54a04dcd…`](https://scan.testnet-chain.genlayer.com/tx/0x54a04dcd742f3e3921a2992a838b4b30c3abfc3c203b0af046b2553f6d504575), [`0x18aefc68…`](https://scan.testnet-chain.genlayer.com/tx/0x18aefc68dda79bea2f7cb9df661844680c60e58a9aafefe754d5b5d2b45650b9), [`0xdd1eb72f…`](https://scan.testnet-chain.genlayer.com/tx/0xdd1eb72f95ba6c0fbaf77f3d30b735f4cba663eb07c4e15c61f503b3f5a465c9)) |
+| #2 | buyer recovers the failed refund to their own address | [`0xe51c77a3…`](https://scan.testnet-chain.genlayer.com/tx/0xe51c77a35ba53134ac20f59dce6f3e750f71b56849da27b6e1095649b732468e) | payout 7 |
 
-Each payout settled from its own transfer after the paying transaction finalized. Balance change is the recipient's `eth_getBalance` at the finalizing block minus the block before, checked by the test:
+Each payout settled from its own transfer after the paying transaction finalized. Balance change is the recipient's `eth_getBalance` at the finalizing block minus the block before, checked by the test (* the recipient also sent the paying transaction, so the same block returns its unused fee deposit; the change is the payout plus that refund):
 
 | Payout | Kind | Paid by | Finalized by (block) | Recipient balance | `settle_payout` | Result |
 |---|---|---|---|---|---|---|
-| 0 | refund → buyer | [`0x55aae771…`](https://explorer-bradbury.genlayer.com/tx/0x55aae77158a4347a6ab742c8a14710fac8a7e85e403e1634c9b4e7d0a12ec34f) | [`0xe91f11ad…`](https://explorer-bradbury.genlayer.com/tx/0xe91f11ad2d910c3657c4abd5e050b016de93c038f3e37f81e7e0d080a161d111) (25537712) | +0.000823 GEN | [`0xe598807f…`](https://explorer-bradbury.genlayer.com/tx/0xe598807f471fe4352a1cb5c537de2a1ae620973a192985222bcd1a69dcdac668) | DELIVERED |
-| 1 | refund → rejecter | [`0x26dab9a1…`](https://explorer-bradbury.genlayer.com/tx/0x26dab9a14439593378ec2c635f16de2b2241e8433ed33b0874334928517a08f7) | [`0xca6930b7…`](https://explorer-bradbury.genlayer.com/tx/0xca6930b748a73595bb839e8818fc858690b08d9ad77923e80410aa5c36513808) (25538034) | 0 GEN | [`0xa8435ebf…`](https://explorer-bradbury.genlayer.com/tx/0xa8435ebf979ec4e85d7ec7e08d321dfbfd2844bd338e5bc30a439b4d4fd1354b) | FAILED: recoverable by the buyer |
-| 2 | release #0 → shop | [`0x6362ee76…`](https://explorer-bradbury.genlayer.com/tx/0x6362ee763c524d38d61401d12de4477e34a38f74189e345ef7dd918b59aae7dd) | [`0x7b5e2d47…`](https://explorer-bradbury.genlayer.com/tx/0x7b5e2d47c8bdca31c8ff1c78b1ab1824a8572812ac0d1c05f59f89dddcbe6afd) (25540564) | +0.005177 GEN | [`0x1ef30ed7…`](https://explorer-bradbury.genlayer.com/tx/0x1ef30ed741aab3e080bf8045b7cbb6a35bc4becade9309039166b938394e47d3) | DELIVERED |
-| 3 | release #1 → shop | [`0x60293134…`](https://explorer-bradbury.genlayer.com/tx/0x6029313495dad38fc102901bdb5f22b38c22f41aaee925348034e554e842367c) | [`0x41c11b14…`](https://explorer-bradbury.genlayer.com/tx/0x41c11b14735f282117fa22a55b3caf47c01e4e536cd157137aa0e5b6fa12a542) (25540580) | +0.005 GEN | [`0x438b298b…`](https://explorer-bradbury.genlayer.com/tx/0x438b298bdb5b96468a86114df165f6e8678cbcd3eabf35654e50a83b33229f72) | DELIVERED |
-| 4 | release #2 → shop | [`0x0a3473b9…`](https://explorer-bradbury.genlayer.com/tx/0x0a3473b97abf320770549c4d27739ec335526969ff76b377b75121d50b27de53) | [`0x6a8e44c8…`](https://explorer-bradbury.genlayer.com/tx/0x6a8e44c8aa7f315483a8624f176b1aaea8c1ac7b6fe37aa032b49019a465fdc7) (25540595) | +0.005177 GEN | [`0xd7d121c7…`](https://explorer-bradbury.genlayer.com/tx/0xd7d121c76b255c3747875f3f6dad6266fbbea861621a50424fa33336a74271e7) | DELIVERED |
-| 5 | recover → buyer | [`0x02db83f4…`](https://explorer-bradbury.genlayer.com/tx/0x02db83f4128da0135be3159093e4737057687a72044fa7d95a566e06dce1a3c7) | [`0xee06ec7b…`](https://explorer-bradbury.genlayer.com/tx/0xee06ec7bb38014124231639f9a2beb1c82d3ec76b89516ce51b29c81b85e5490) (25542906) | +0.000823 GEN | [`0xe9824ebf…`](https://explorer-bradbury.genlayer.com/tx/0xe9824ebf990e3f7f711f59f7a726cd7407708b79d542d85f47bfeabe55b118a1) | DELIVERED |
+| 0 | refund → buyer | [`0x703faafb…`](https://scan.testnet-chain.genlayer.com/tx/0x703faafb0144cdc89c35d96221e25a27958da07e575b88aaeaa959721837c97c) | [`0x0c7dedd2…`](https://scan.testnet-chain.genlayer.com/tx/0x0c7dedd2b7eb4dcd4a84ebfb43897fcd080bdfb39067232f49ccb0b095017210) (189739) | +0.000823 GEN* | [`0x44fc1419…`](https://scan.testnet-chain.genlayer.com/tx/0x44fc1419cec9353b3f624080153c10dac884cba05972168e2f4869ca5bbeacf0) | DELIVERED |
+| 1 | refund → EVM rejecter | [`0xb0c198f2…`](https://scan.testnet-chain.genlayer.com/tx/0xb0c198f2f775ef0571912f3bf80e8262f78365506904a8fee40a487ce3ad87d9) | [`0xef53196e…`](https://scan.testnet-chain.genlayer.com/tx/0xef53196e1ea428b01a72cd5f24e03b15ffc89dc96a4c3024777afafc7338c9a1) (189864) | 0 GEN | [`0x84d1dd15…`](https://scan.testnet-chain.genlayer.com/tx/0x84d1dd15e14019e918f3f2527cfd7bdebbee2566e4195b60a1cad6fd4688c908) | FAILED: recoverable by the buyer |
+| 2 | refund → GenLayer contract | [`0xe68d5233…`](https://scan.testnet-chain.genlayer.com/tx/0xe68d5233d5735b6d3fc778e8f1b20b04c7a85893860fc8022dfa57cbe75e69fb) | [`0xbf60a070…`](https://scan.testnet-chain.genlayer.com/tx/0xbf60a0704317d2d2c3678e6555dc6485f8aaf97b2087de28e4163735bc48bf87) (189888) | +0.000823 GEN | [`0x4611a3f3…`](https://scan.testnet-chain.genlayer.com/tx/0x4611a3f31f9bcc5ce8e21c2832d4c739e8a07d3d4d5d547219e304d72827b4f2) | DELIVERED |
+| 3 | release #0 → shop | [`0xb07d0f71…`](https://scan.testnet-chain.genlayer.com/tx/0xb07d0f716a6f72ff5acd8271d2ab86d2f2e313974bcd43d139cd8b4e024356e5) | [`0xf7af65f7…`](https://scan.testnet-chain.genlayer.com/tx/0xf7af65f7b616aead943693cef371bd0172271add89a6761c70126a5d0f63ea0d) (190016) | +0.005177 GEN* | [`0x385525b8…`](https://scan.testnet-chain.genlayer.com/tx/0x385525b804bfc4a8fc524da9927671ee3219414463df1f80a5af25dfb29d16be) | DELIVERED |
+| 4 | release #1 → shop | [`0x54a04dcd…`](https://scan.testnet-chain.genlayer.com/tx/0x54a04dcd742f3e3921a2992a838b4b30c3abfc3c203b0af046b2553f6d504575) | [`0x8ed77fb8…`](https://scan.testnet-chain.genlayer.com/tx/0x8ed77fb89c19b97c71a05e2f5a389c24324503422f3d7232e325565fe1c19707) (190032) | +0.005 GEN* | [`0xd73e9cd6…`](https://scan.testnet-chain.genlayer.com/tx/0xd73e9cd61723bd6f44c823d16786e8df8c02fad2a00067ab9defef77bc2d66f2) | DELIVERED |
+| 5 | release #2 → shop | [`0x18aefc68…`](https://scan.testnet-chain.genlayer.com/tx/0x18aefc68dda79bea2f7cb9df661844680c60e58a9aafefe754d5b5d2b45650b9) | [`0xff7d1a26…`](https://scan.testnet-chain.genlayer.com/tx/0xff7d1a26b729229e314d59ad281a1e6005643e69d6ea1f1704e1f6c1c43eecaa) (190054) | +0.005177 GEN* | [`0x180cf6ee…`](https://scan.testnet-chain.genlayer.com/tx/0x180cf6eeee9a655cc6b7083e3d844eab3aa7f29607267a1cdb20bddff3ecd254) | DELIVERED |
+| 6 | release #3 → shop | [`0xdd1eb72f…`](https://scan.testnet-chain.genlayer.com/tx/0xdd1eb72f95ba6c0fbaf77f3d30b735f4cba663eb07c4e15c61f503b3f5a465c9) | [`0x8c6f2b73…`](https://scan.testnet-chain.genlayer.com/tx/0x8c6f2b73870a25c0bafc4ca7da6f9b2482a6a4e6c4d5121358596ac784c84636) (190063) | +0.005177 GEN* | [`0xf4a15527…`](https://scan.testnet-chain.genlayer.com/tx/0xf4a1552783901362c4d8dc53954754c060f337680b3a26fe5067fda068f09320) | DELIVERED |
+| 7 | recover → buyer | [`0xe51c77a3…`](https://scan.testnet-chain.genlayer.com/tx/0xe51c77a35ba53134ac20f59dce6f3e750f71b56849da27b6e1095649b732468e) | [`0x5ad164a9…`](https://scan.testnet-chain.genlayer.com/tx/0x5ad164a9492363a07351d6345f867a3138c16278f58a9ef9546db57de63ca92f) (190417) | +0.000823 GEN* | [`0x7417df7b…`](https://scan.testnet-chain.genlayer.com/tx/0x7417df7b6ccea7013d9c9e35efaf0465cf7b322602e3d73adb6c3634d4d4fb9e) | DELIVERED |
 
-Settling the same payout again is rejected each time ([`0x1c213f9e…`](https://explorer-bradbury.genlayer.com/tx/0x1c213f9e8d1b2beb44b5f0da7093ad4d4da9cb2de98069c229188a748ad5ded0), [`0x1d191f17…`](https://explorer-bradbury.genlayer.com/tx/0x1d191f173e1bb64ea95d42a9ad30ce1dc637739551161f18befd2225d632a3cb), [`0xacc91433…`](https://explorer-bradbury.genlayer.com/tx/0xacc9143390b51490f76b47db3e9ffa9813f65eeeb8d7739724b388c20d13b174), [`0x417b8107…`](https://explorer-bradbury.genlayer.com/tx/0x417b8107496ebac9e98ba40b20dcca707b8470111d7017900d05c1aeb0437872), [`0x20034b0c…`](https://explorer-bradbury.genlayer.com/tx/0x20034b0c1af7ad354db74d45719d2e7e9fb7ad7b7671f8a0a552383b97e37b99), [`0x473365fe…`](https://explorer-bradbury.genlayer.com/tx/0x473365fe5a4a835adf6f1f65ce714224484e0c3126d8e7992bf86e83d99c36e0)). Afterwards `get_accounting` reports expected balance 0, `unaccounted: 0`.
+Payout 2 went to a GenLayer contract: on Phase 2 it is an external message like any other, no child transaction is created, and it settled DELIVERED from the transfer's `TransactionExecuted` log. Settling the same payout again is rejected each time ([`0x8b107930…`](https://scan.testnet-chain.genlayer.com/tx/0x8b107930631edd5e0243ee7de9be4006772830da79534a6c85b236bba9e9fcd8), [`0x9360cc51…`](https://scan.testnet-chain.genlayer.com/tx/0x9360cc51fb91141ceab6d5a9a77d0d1321008a54c79a0389fba87f539c696c8e), [`0xfa5a7f98…`](https://scan.testnet-chain.genlayer.com/tx/0xfa5a7f983b363557a863c1d1d8d384e4c7b9e4dea10c0eaa6f711185b14988db), [`0x54f136c3…`](https://scan.testnet-chain.genlayer.com/tx/0x54f136c3ededfb1e2fa2fbf29e4ea729962ef7d7db29feb4a196c26d8f067757), [`0x0d986029…`](https://scan.testnet-chain.genlayer.com/tx/0x0d9860297a80c38fbd59d02657e3b1a9c902f9266b268e86f05d28f37eeb5f85), [`0x26c15833…`](https://scan.testnet-chain.genlayer.com/tx/0x26c15833f09e53acf72be6747a21849e950bb122c1f2307b15b9d81687b0e243), [`0xe1c4f120…`](https://scan.testnet-chain.genlayer.com/tx/0xe1c4f1202981e3012b50c39f43f8c1799789e5673305f13345cb0edb5ae2ebff)). Afterwards `get_accounting` reports `unaccounted: 0`.
 
 The competitor in the E2E is [books.toscrape.com](https://books.toscrape.com),
 a public demo store built for scraping practice: its pages are stable, so the
@@ -133,6 +137,13 @@ finalizes, so the contract never assumes a payment arrived.
      child, payee)`). Validators then read the child: it must be to the
      payee and finalized; **DELIVERED** only if it finished with a return,
      otherwise **FAILED** and recoverable by the payee as below.
+     On Bradbury Phase 2 no child is created: every payout is an external
+     message, a GenLayer-contract payee receives the value on its account
+     (its `__receive__` is not run), and step 3 settles it. Checked live:
+     [`0x2d8cf8fd…`](https://scan.testnet-chain.genlayer.com/tx/0x2d8cf8fdb1bca3d73a205a8946e2aef917692cdaeda97fe1ba0803caaee932a1)
+     paid 1000 wei to contract `0x30EC0dDc…`, finalized in
+     [`0x5eb8b667…`](https://scan.testnet-chain.genlayer.com/tx/0x5eb8b6678e7027e974c3073fbd43540e1878e0275db961ad78027d5c3fa3c9a6)
+     with `TransactionExecuted` and no `InternalMessageProcessed`.
 - A FAILED payout is credited to its payee (buyer for refunds, shop for
   releases); `recover(purchase, to)` re-sends it to any address.
 - A payout settles once, and a paying transaction settles at most one payout.
@@ -172,13 +183,14 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 genvm-lint check contracts/price_match.py
 pytest tests/direct -v                         # 47 tests
-# integration, on Bradbury, against the packed code (keys in GL_PK0..1 env vars)
+# integration, on Bradbury, against the packed code (keys in GL_PK0..1 env vars, ~1.5 h)
 python deploy/shrink.py contracts/price_match.py build/price_match.py --pack
-cd tests/integration && gltest . -v -s --network testnet_bradbury
+npm i genlayer-js@2.0.0-rc.2   # plus the fee-estimate patch in app/README.md
+node tests/integration/bradbury.mjs build/price_match.py
 ```
 
 The source is 32 KB; Bradbury rejects deploys above ~20 KB of code, so deploy
-the output of `deploy/shrink.py` (AST-checked; 9.1 KB packed). CI re-runs the
+the output of `deploy/shrink.py` (AST-checked; 9.3 KB packed). CI re-runs the
 direct tests against the packed code.
 
 ## Tests (47 direct, Bradbury E2E)
@@ -186,7 +198,7 @@ direct tests against the packed code.
 - **Listing and buying**: validation of every listing field; exact payment, the shop cannot buy, refund address.
 - **Claims**: proportional refund; validators must agree on the exact price, and on every rejected reason (different product, out of stock, other currency, no price, not lower); thousands separators; domain allowlist with subdomains and `www.`; an unavailable page does not use up a claim; truncation is flagged; fenced page text; claim limits and window; malformed model answers.
 - **Money**: release after the window; claims and releases revert when the contract cannot pay; delivered and failed settlement, including a payee that is a GenLayer contract (settled from its child transaction: delivered, failed and recoverable by the payee, not yet finalized, to another address); recovery by the right party, to any address, repeatable after another failure; settle rejects another transaction, sender, time, method, purchase or address, a finalization of another transaction, and a call that sent nothing.
-- **Bradbury E2E** (`tests/integration`): real validators read books.toscrape.com and real transfers settle, as in the evidence above.
+- **Bradbury E2E** (`tests/integration/bradbury.mjs`): real validators read books.toscrape.com and real transfers settle (to a wallet, an EVM contract that rejects value, and a GenLayer contract), as in the evidence above.
 
 ## License
 

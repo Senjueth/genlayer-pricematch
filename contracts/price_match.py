@@ -1,4 +1,5 @@
-# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+# v0.3.0
+# { "Depends": "py-genlayer:babwp9t37jw9g4j2bccgn14g6x7x9s1f7dsmh7emvz735pz4zxa0" }
 """
 PriceMatch — a price-match guarantee that pays out without the shop's say-so.
 
@@ -32,7 +33,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from genlayer import *
+import genlayer as gl
+from genlayer.storage import DynArray, TreeMap, allow as allow_storage
+from genlayer.types import *
 
 ERR_EXPECTED = "[EXPECTED]"
 ERR_EXTERNAL = "[EXTERNAL]"
@@ -52,19 +55,23 @@ MAX_PAGE_CHARS = 8_000
 MIN_WINDOW = 3_600
 MAX_WINDOW = 90 * 86_400
 
-# Transfer results on Testnet Bradbury. When a paying
-# transaction finalizes, the consensus contract executes its value transfer
-# through this contract's ghost account, in the EVM transaction that emits
-# TransactionFinalized. The ghost emits TransactionExecuted(to, msgId, data)
-# only if the value call succeeded; the messages contract links the message to
-# its parent with MessagesOnFinalization(txId, msgId).
+# Transfer results on Testnet Bradbury (Phase 2): every payout is an external
+# message. When the paying transaction finalizes, the consensus contract runs
+# the value call through this contract's ghost account, in the EVM transaction
+# that emits TransactionFinalized. The ghost emits TransactionExecuted(to,
+# msgId, data) only if the call succeeded; the messages contract links the
+# message to its parent with MessagesOnFinalization(txId, msgId), and logs
+# MessageExternalError / MessageExternalOutOfGas(txId, msgId) when it failed.
 RPC_URL = "https://rpc-bradbury.genlayer.com"
-CONSENSUS_MAIN = "0x0112bf6e83497965a5fdd6dad1e447a6e004271d"
-CONSENSUS_MESSAGES = "0x27872802226532fcd7fea2f00addbffbd3380ade"
+CONSENSUS_MAIN = "0x2e2766cbc3e5e61ce93bbcdcbb3eacb82082a019"
+CONSENSUS_MESSAGES = "0xd14b0489157fe420555f1e5a6afba031e978ace5"
 T_FINALIZED = "0x24196ec40f90671b7144e716978686b4f3c7d6b00b23da3971ef2b52af27d87f"
 T_EXECUTED = "0x4aacc1769103d0575734a31601a30d8f74c7843414f868342af438b4fdc4d78e"
 T_MESSAGE = "0x1a2b93b175bf31d44b127b5c4c0f72cbf128f5230ad594a52a00dfa559c96b51"
-T_MSG_FAILED = "0x5ae8e754fbc8b7b56c89e264bdcd8bb847036b23ac1a0f791f48b62438f2bab9"  # messages contract: (tx, msgId) whose execution failed
+T_MSG_FAILED = (  # messages contract: (tx, msgId) whose value call failed
+    "0x5ae8e754fbc8b7b56c89e264bdcd8bb847036b23ac1a0f791f48b62438f2bab9",  # MessageExternalError
+    "0x97a034ff8fab7e4de24992575acaa9eb95a9c48411292c420aa711b24405811c",  # MessageExternalOutOfGas
+)
 T_INTERNAL = "0xfcd4925545581224af98ce36b42d51bb88917ea0c3fe675c27e1df1a22282555"
 GEN_FINALIZED = 7
 GEN_RETURNED = 1  # txExecutionResult: FINISHED_WITH_RETURN
@@ -157,7 +164,7 @@ class _Payee:
 
 
 def _now() -> int:
-    return int(datetime.now(timezone.utc).timestamp())
+    return int(datetime.fromisoformat(gl.message.raw["datetime"].replace("Z", "+00:00")).timestamp())
 
 
 def _fence(text: str) -> str:
@@ -258,14 +265,14 @@ def _outcome(r: dict, currency: str, list_price: int, paid: int, held: int) -> t
 
 
 def _agree_on_error(leader_result, q: dict, fn) -> bool:
-    msg = getattr(leader_result, "message", "")
+    msg = str(getattr(leader_result, "data", getattr(leader_result, "message", "")))
     try:
         fn(q)
         return False
     except gl.vm.UserError as e:
-        if e.message.startswith(ERR_EXPECTED) or e.message.startswith(ERR_EXTERNAL):
-            return e.message == msg
-        if e.message.startswith(ERR_TRANSIENT):
+        if str(e.data).startswith(ERR_EXPECTED) or str(e.data).startswith(ERR_EXTERNAL):
+            return str(e.data) == msg
+        if str(e.data).startswith(ERR_TRANSIENT):
             return msg.startswith(ERR_TRANSIENT)
         return False
     except Exception:
@@ -325,7 +332,8 @@ def _transfer_result(q: dict) -> str:
         raise gl.vm.UserError(f"{ERR_EXPECTED} that transaction did not create this payout")
     call = _payload(bytes.fromhex(str(tx.get("txCallData", "")).removeprefix("0x")))
     a = call["args"]
-    ok = call.get("method") == PAYING[q["kind"]] and len(a) >= 1 and a[0] == q["purchase_id"]
+    # genlayer-js 2.x stores the method name under "", older clients under "method".
+    ok = call.get("", call.get("method")) == PAYING[q["kind"]] and len(a) >= 1 and a[0] == q["purchase_id"]
     if ok and q["kind"] == "recover":
         ok = len(a) >= 2 and _hex(a[1]) == q["to"]
     if not ok:
@@ -355,7 +363,7 @@ def _transfer_result(q: dict) -> str:
     # A failed transfer leaves the messages contract's failure event for the
     # paying transaction; a transaction that sent nothing (e.g. a call of the
     # same method that did not pay) leaves neither, so it cannot settle FAILED.
-    if any(addr == CONSENSUS_MESSAGES and len(t) == 3 and t[:2] == [T_MSG_FAILED, q["tx"]] for addr, t, _ in logs):
+    if any(addr == CONSENSUS_MESSAGES and len(t) == 3 and t[0] in T_MSG_FAILED and t[1] == q["tx"] for addr, t, _ in logs):
         return "failed"
     raise gl.vm.UserError(f"{ERR_EXPECTED} that transaction did not create this payout")
 
@@ -376,7 +384,7 @@ def _add(a, b) -> u256:
 # ─── Contract ────────────────────────────────────────────────────────────────
 
 
-class PriceMatch(gl.Contract):
+class PriceMatch(gl.contract.Contract):
     products: DynArray[Product]
     purchases: DynArray[Purchase]
     claims: DynArray[Claim]
@@ -518,7 +526,7 @@ class PriceMatch(gl.Contract):
             except Exception:
                 return False
 
-        r = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        r = gl.vm.run_nondet(leader_fn, validator_fn)
         outcome, reason, refund = _outcome(r, pu.currency, int(pu.list_price), int(pu.paid), int(pu.held))
         if refund > 0:  # pays first: nothing is recorded if the transfer cannot be sent
             self._pay(purchase_id, pu, pu.refund_to, refund, "refund", "buyer")
@@ -619,7 +627,7 @@ class PriceMatch(gl.Contract):
             except Exception:
                 return False
 
-        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        result = gl.vm.run_nondet(leader_fn, validator_fn)
         p.tx = tx_hash
         self.settled_txs[tx_hash] = u256(payout_id)
         if result == "delivered":
@@ -785,5 +793,7 @@ class PriceMatch(gl.Contract):
         self.payout_index[f"{purchase_id}:{k}"] = u256(pid)
         pu.payout_count = u256(k + 1)
         self.expected_balance = u256(max(0, int(self.expected_balance) - amount))
-        _Payee(to).emit_transfer(value=u256(amount))
+        # An external (EVM) message. The caller funds its gas through the
+        # transaction's fee allocation (see app/gl.js).
+        _Payee(to).emit_transfer(u256(amount))
         return pid
